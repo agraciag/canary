@@ -1,0 +1,73 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Jupyter
+.ipynb_checkpoints
+*/.ipynb_checkpoints/*
+.jupyter/
+
+# Virtual Environment
+venv/
+.env
+.venv
+ENV/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Docker
+.docker/
+
+# Certificates and Keys
+*.pem
+*.key
+*.crt
+*.cer
+*.pfx
+*.p12
+
+# Local development settings
+config.local.yaml
+secrets.yaml
+credentials.json
+
+# Audio files
+*.wav
+*.mp3
+*.flac
+
+# Model files
+*.pt
+*.pth
+*.ckpt
+*.model
+
+# Logs
+*.log
+logs/
+
+# Project specific
+tree.txt
+instrucciones.txt

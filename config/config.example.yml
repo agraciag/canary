@@ -1,0 +1,27 @@
+model:
+  name: nvidia/canary-1b
+  beam_size: 1
+  
+audio:
+  sample_rate: 16000
+  channels: 1
+  chunk_size: 1024
+  record_seconds: 3
+
+transcription:
+  default_language: en
+  enable_translation: true
+  supported_languages:
+    - en
+    - de
+    - es
+    - fr
+  punctuation: true
+  
+api_keys:
+  nvidia_ngc: your_ngc_key_here
+  
+paths:
+  output_dir: /workspace/transcripts
+  temp_dir: /workspace/temp
+  model_dir: /workspace/models
