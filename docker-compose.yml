@@ -10,9 +10,7 @@ services:
       - NVIDIA_VISIBLE_DEVICES=0
     volumes:
       - ./workspace:/workspace
-      - /dev/snd:/dev/snd
-    devices:
-      - /dev/snd:/dev/snd
+      - ./src:/workspace/src
     ipc: host
     ulimits:
       memlock: -1

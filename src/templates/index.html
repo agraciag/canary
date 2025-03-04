@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Canary Real-Time Transcription</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            padding-top: 20px;
+            background-color: #f5f5f5;
+        }
+        .transcription-box {
+            min-height: 300px;
+            max-height: 500px;
+            overflow-y: auto;
+            background-color: white;
+            padding: 15px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .transcription-item {
+            margin-bottom: 10px;
+            padding: 10px;
+            border-radius: 5px;
+            background-color: #f0f7ff;
+        }
+        .status-indicator {
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 5px;
+        }
+        .status-active {
+            background-color: #28a745;
+            animation: pulse 1.5s infinite;
+        }
+        .status-inactive {
+            background-color: #dc3545;
+        }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="text-center mb-4">Canary Real-Time Transcription</h1>
+        
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">
+                                <span id="status-indicator" class="status-indicator status-inactive"></span>
+                                <span id="status-text">Inactive</span>
+                            </h5>
+                            <div>
+                                <button id="startBtn" class="btn btn-success">Start</button>
+                                <button id="stopBtn" class="btn btn-danger" disabled>Stop</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <form id="transcriptionForm">
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label for="deviceSelect" class="form-label">Input Device</label>
+                                    <select id="deviceSelect" class="form-select">
+                                        <option value="default">Default Device</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="taskSelect" class="form-label">Task</label>
+                                    <select id="taskSelect" class="form-select">
+                                        <option value="asr">Speech Recognition (ASR)</option>
+                                        <option value="translation">Translation</option>
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <div class="row mb-3">
+                                <div class="col-md-4">
+                                    <label for="sourceLangSelect" class="form-label">Source Language</label>
+                                    <select id="sourceLangSelect" class="form-select">
+                                        <option value="en">English</option>
+                                        <option value="de">German</option>
+                                        <option value="es">Spanish</option>
+                                        <option value="fr">French</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="targetLangSelect" class="form-label">Target Language</label>
+                                    <select id="targetLangSelect" class="form-select">
+                                        <option value="en">English</option>
+                                        <option value="de">German</option>
+                                        <option value="es">Spanish</option>
+                                        <option value="fr">French</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="bufferSize" class="form-label">Buffer Size (seconds)</label>
+                                    <input type="number" id="bufferSize" class="form-control" min="1" max="10" step="0.5" value="2">
+                                </div>
+                            </div>
+                            
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="pncCheckbox" checked>
+                                        <label class="form-check-label" for="pncCheckbox">
+                                            Include punctuation and capitalization
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Transcription</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="transcriptionBox" class="transcription-box">
+                            <div id="transcriptionContent">
+                                <p class="text-muted text-center">Transcriptions will appear here...</p>
+                            </div>
+                        </div>
+                        <div id="saveInfo" class="alert alert-success d-none">
+                            Transcript saved to: <span id="saveFilename"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.socket.io/4.4.1/socket.io.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Connect to Socket.IO server
+            const socket = io();
+            
+            // Get elements
+            const statusIndicator = document.getElementById('status-indicator');
+            const statusText = document.getElementById('status-text');
+            const startBtn = document.getElementById('startBtn');
+            const stopBtn = document.getElementById('stopBtn');
+            const deviceSelect = document.getElementById('deviceSelect');
+            const taskSelect = document.getElementById('taskSelect');
+            const sourceLangSelect = document.getElementById('sourceLangSelect');
+            const targetLangSelect = document.getElementById('targetLangSelect');
+            const bufferSize = document.getElementById('bufferSize');
+            const pncCheckbox = document.getElementById('pncCheckbox');
+            const transcriptionContent = document.getElementById('transcriptionContent');
+            const saveInfo = document.getElementById('saveInfo');
+            const saveFilename = document.getElementById('saveFilename');
+            
+            // Load available devices
+            fetch('/devices')
+                .then(response => response.json())
+                .then(data => {
+                    data.devices.forEach(device => {
+                        const option = document.createElement('option');
+                        option.value = device.id;
+                        option.textContent = `${device.name} (${device.inputs} inputs)`;
+                        deviceSelect.appendChild(option);
+                    });
+                });
+            
+            // Handle task selection change
+            taskSelect.addEventListener('change', function() {
+                if (this.value === 'asr') {
+                    // For ASR, set target language to match source language
+                    targetLangSelect.value = sourceLangSelect.value;
+                    targetLangSelect.disabled = true;
+                } else {
+                    // For translation, enable target language selection
+                    targetLangSelect.disabled = false;
+                }
+            });
+            
+            // Also update target language when source language changes in ASR mode
+            sourceLangSelect.addEventListener('change', function() {
+                if (taskSelect.value === 'asr') {
+                    targetLangSelect.value = this.value;
+                }
+            });
+            
+            // Initial setup
+            if (taskSelect.value === 'asr') {
+                targetLangSelect.value = sourceLangSelect.value;
+                targetLangSelect.disabled = true;
+            }
+            
+            // Start transcription
+            startBtn.addEventListener('click', function() {
+                // Update UI
+                startBtn.disabled = true;
+                stopBtn.disabled = false;
+                statusIndicator.classList.remove('status-inactive');
+                statusIndicator.classList.add('status-active');
+                statusText.textContent = 'Active';
+                
+                // Clear previous transcriptions
+                transcriptionContent.innerHTML = '';
+                saveInfo.classList.add('d-none');
+                
+                // Get form values
+                const config = {
+                    device: deviceSelect.value,
+                    task: taskSelect.value,
+                    source_lang: sourceLangSelect.value,
+                    target_lang: targetLangSelect.value,
+                    buffer_size: bufferSize.value,
+                    pnc: pncCheckbox.checked ? 'yes' : 'no',
+                    beam_size: 1
+                };
+                
+                // Start transcription
+                socket.emit('start_transcription', config);
+            });
+            
+            // Stop transcription
+            stopBtn.addEventListener('click', function() {
+                socket.emit('stop_transcription');
+                
+                // Update UI
+                startBtn.disabled = false;
+                stopBtn.disabled = true;
+                statusIndicator.classList.remove('status-active');
+                statusIndicator.classList.add('status-inactive');
+                statusText.textContent = 'Inactive';
+            });
+            
+            // Handle incoming transcriptions
+            socket.on('transcription', function(data) {
+                // Create transcription item
+                const item = document.createElement('div');
+                item.className = 'transcription-item';
+                
+                // Add text
+                const text = document.createElement('p');
+                text.className = 'mb-0';
+                text.textContent = data.text;
+                item.appendChild(text);
+                
+                // Add metadata
+                const meta = document.createElement('small');
+                meta.className = 'text-muted';
+                let metaText = `Chunk #${data.chunk_index} - Processing time: ${data.processing_time}`;
+                if (data.task === 'translation') {
+                    metaText += ` - ${data.source_lang} → ${data.target_lang}`;
+                }
+                meta.textContent = metaText;
+                item.appendChild(meta);
+                
+                // Add to transcription box
+                if (transcriptionContent.querySelector('.text-muted')) {
+                    transcriptionContent.innerHTML = '';
+                }
+                transcriptionContent.appendChild(item);
+                
+                // Auto-scroll to bottom
+                const box = document.getElementById('transcriptionBox');
+                box.scrollTop = box.scrollHeight;
+            });
+            
+            // Handle transcript saved notification
+            socket.on('transcript_saved', function(data) {
+                saveFilename.textContent = data.filename;
+                saveInfo.classList.remove('d-none');
+            });
+        });
+    </script>
